@@ -6,10 +6,13 @@
 
     // Clean up any existing highlights on page load/refresh
     function cleanup() {
-        const elements = document.querySelectorAll(
+        document.querySelectorAll(
             '.wff-highlight, .wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast'
-        );
-        elements.forEach(el => el.remove());
+        ).forEach(el => el.remove());
+        document.querySelectorAll('.wff-anchored').forEach(el => {
+            el.style.anchorName = '';
+            el.classList.remove('wff-anchored');
+        });
 
         // Reset inspector state if active
         if (window.wffInspectorActive) {

@@ -316,13 +316,17 @@ function getComputedFontStyles(fontFamily, tag) {
 
 // Content script function: Toggle element highlighting
 function toggleHighlight(fontFamily, tags, highlight) {
-    const existingHighlights = document.querySelectorAll('.wff-highlight');
-    existingHighlights.forEach(el => el.remove());
+    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
+    document.querySelectorAll('.wff-anchored').forEach(el => {
+        el.style.anchorName = '';
+        el.classList.remove('wff-anchored');
+    });
 
     if (!highlight) return;
 
     const selector = tags.join(', ');
     const elements = document.querySelectorAll(selector);
+    let i = 0;
 
     elements.forEach(element => {
         const computedStyle = window.getComputedStyle(element);
@@ -336,14 +340,19 @@ function toggleHighlight(fontFamily, tags, highlight) {
         const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return;
 
+        const anchor = `--wff-a-${i++}`;
+        element.style.anchorName = anchor;
+        element.classList.add('wff-anchored');
+
         const highlightEl = document.createElement('div');
         highlightEl.className = 'wff-highlight';
         highlightEl.style.cssText = `
-            position: fixed;
-            top: ${rect.top}px;
-            left: ${rect.left}px;
-            width: ${rect.width}px;
-            height: ${rect.height}px;
+            position: absolute;
+            position-anchor: ${anchor};
+            top: anchor(top);
+            left: anchor(left);
+            width: anchor-size(width);
+            height: anchor-size(height);
             background-color: rgba(0, 122, 204, 0.12);
             border: 2px solid rgba(0, 122, 204, 0.6);
             pointer-events: none;
@@ -357,12 +366,16 @@ function toggleHighlight(fontFamily, tags, highlight) {
 
 // Content script function: Highlight and scroll to first element
 function highlightAndScroll(fontFamily, tags) {
-    const existingHighlights = document.querySelectorAll('.wff-highlight');
-    existingHighlights.forEach(el => el.remove());
+    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
+    document.querySelectorAll('.wff-anchored').forEach(el => {
+        el.style.anchorName = '';
+        el.classList.remove('wff-anchored');
+    });
 
     const selector = tags.join(', ');
     const elements = document.querySelectorAll(selector);
     let firstElement = null;
+    let i = 0;
 
     elements.forEach(element => {
         const computedStyle = window.getComputedStyle(element);
@@ -376,19 +389,23 @@ function highlightAndScroll(fontFamily, tags) {
         const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return;
 
-        // Track first visible element for scrolling
         if (!firstElement) {
             firstElement = element;
         }
 
+        const anchor = `--wff-a-${i++}`;
+        element.style.anchorName = anchor;
+        element.classList.add('wff-anchored');
+
         const highlightEl = document.createElement('div');
         highlightEl.className = 'wff-highlight';
         highlightEl.style.cssText = `
-            position: fixed;
-            top: ${rect.top}px;
-            left: ${rect.left}px;
-            width: ${rect.width}px;
-            height: ${rect.height}px;
+            position: absolute;
+            position-anchor: ${anchor};
+            top: anchor(top);
+            left: anchor(left);
+            width: anchor-size(width);
+            height: anchor-size(height);
             background-color: rgba(0, 122, 204, 0.15);
             border: 2px solid rgba(0, 122, 204, 0.7);
             pointer-events: none;
@@ -399,7 +416,6 @@ function highlightAndScroll(fontFamily, tags) {
         document.body.appendChild(highlightEl);
     });
 
-    // Scroll to first element with smooth animation
     if (firstElement) {
         firstElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
