@@ -7,7 +7,7 @@
     // Clean up any existing highlights on page load/refresh
     function cleanup() {
         const elements = document.querySelectorAll(
-            '.wff-highlight, .wff-hover-highlight, .wff-hover-tooltip'
+            '.wff-highlight, .wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast'
         );
         elements.forEach(el => el.remove());
 
