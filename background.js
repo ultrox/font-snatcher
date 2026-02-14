@@ -4,21 +4,48 @@ chrome.runtime.onInstalled.addListener(() => {
     console.log('Font Snatcher extension installed');
 });
 
-// Handle tab updates to clean up any active inspector mode
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.url) {
-        // Clean up any active inspector mode when page loads
-        chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            function: cleanupInspectorMode
-        }).catch(() => {
-            // Ignore errors for pages we can't access
+// Clean up when popup closes (port disconnects)
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === 'popup') {
+        port.onDisconnect.addListener(async () => {
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab && tab.url && !tab.url.startsWith('chrome://')) {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        function: cleanupAll
+                    });
+                }
+            } catch (e) {
+                // Ignore errors for pages we can't access
+            }
         });
     }
 });
 
-// Cleanup function to be injected
-function cleanupInspectorMode() {
+// Handle tab updates to clean up any active inspector mode
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url) {
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            function: cleanupAll
+        }).catch(() => {});
+    }
+});
+
+// Full cleanup function to be injected
+function cleanupAll() {
+    // Remove highlights, tooltips, toasts
+    document.querySelectorAll('.wff-highlight, .wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast')
+        .forEach(el => el.remove());
+
+    // Remove anchor names
+    document.querySelectorAll('.wff-anchored').forEach(el => {
+        el.style.anchorName = '';
+        el.classList.remove('wff-anchored');
+    });
+
+    // Disable inspector mode
     if (window.wffInspectorActive) {
         window.wffInspectorActive = false;
         document.body.style.cursor = '';
@@ -26,12 +53,9 @@ function cleanupInspectorMode() {
         if (window.wffInspectorHandlers) {
             document.removeEventListener('mouseover', window.wffInspectorHandlers.mouseover, true);
             document.removeEventListener('mouseout', window.wffInspectorHandlers.mouseout, true);
+            document.removeEventListener('click', window.wffInspectorHandlers.click, true);
             document.removeEventListener('keydown', window.wffInspectorHandlers.keydown, true);
             window.wffInspectorHandlers = null;
         }
     }
-
-    // Remove any highlights or tooltips
-    const elements = document.querySelectorAll('.wff-highlight, .wff-hover-highlight, .wff-hover-tooltip');
-    elements.forEach(el => el.remove());
 }

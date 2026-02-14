@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentTab = null;
     let isInspectorActive = false;
 
+    // Background detects popup close via port disconnect and runs cleanup
+    chrome.runtime.connect({ name: 'popup' });
+
     init();
 
     async function init() {
