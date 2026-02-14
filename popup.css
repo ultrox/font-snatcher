@@ -340,16 +340,42 @@ body {
 }
 
 .typo-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     flex-shrink: 0;
     font-size: 10px;
     font-weight: 600;
+    font-family: inherit;
     background: #e0e0e0;
     color: #777;
     padding: 2px 6px;
+    border: none;
     border-radius: 10px;
     min-width: 18px;
     text-align: center;
     margin-left: 8px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.typo-count:hover {
+    background: #d0d0d0;
+}
+
+.typo-chevron {
+    display: none;
+    font-size: 12px;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.typo-group.show-preview .typo-chevron {
+    display: inline;
+}
+
+.typo-count.expanded .typo-chevron {
+    transform: rotate(90deg);
 }
 
 .typo-preview {

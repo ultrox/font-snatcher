@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="typo-row" data-tag="${style.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">
                         <span class="typo-row-tag">${style.tag}</span>
                         <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${fmtLineHeight(style.lineHeight, style.size)} / ${style.displayName}</span>
-                        <span class="typo-count">&times;${style.count}</span>
+                        <button class="typo-count" data-tag="${style.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">&times;${style.count}<span class="typo-chevron">&#x203A;</span></button>
                     </div>
                     <div class="typo-preview" style="font-family: ${previewFont}; font-size: ${previewSize}px; font-weight: ${style.weight}; line-height: ${style.lineHeight}; font-style: ${style.fontStyle}; text-transform: ${style.textTransform}; letter-spacing: ${style.letterSpacing}">${escapedSample}</div>`;
                 }).join('')}
@@ -244,10 +244,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const group = btn.closest('.typo-group');
                 group.classList.toggle('show-preview');
                 btn.classList.toggle('active');
+
+                if (!group.classList.contains('show-preview')) {
+                    group.querySelectorAll('.typo-preview-instance').forEach(el => el.remove());
+                    group.querySelectorAll('.typo-count.expanded').forEach(b => b.classList.remove('expanded'));
+                }
             });
         });
 
-        // Click to highlight matching elements
+        // Click row to highlight matching elements on page
         document.querySelectorAll('.typo-row').forEach(row => {
             row.addEventListener('click', async () => {
                 const wasActive = row.classList.contains('active');
@@ -263,6 +268,54 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await highlightTypographyElements(tag, font, size, weight, lineHeight);
                 } else {
                     await clearHighlights();
+                }
+            });
+        });
+
+        // Click count button to expand/collapse all instances
+        document.querySelectorAll('.typo-count').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const row = btn.closest('.typo-row');
+                const group = row.closest('.typo-group');
+
+                // Auto-enable preview mode on this card if not already
+                if (!group.classList.contains('show-preview')) {
+                    group.classList.add('show-preview');
+                    group.querySelector('.typo-preview-toggle').classList.add('active');
+                }
+
+                const wasExpanded = btn.classList.contains('expanded');
+                // Collapse any previously expanded in this group
+                group.querySelectorAll('.typo-preview-instance').forEach(el => el.remove());
+                group.querySelectorAll('.typo-count.expanded').forEach(b => b.classList.remove('expanded'));
+
+                if (!wasExpanded) {
+                    btn.classList.add('expanded');
+                    const preview = row.nextElementSibling;
+                    if (preview && preview.classList.contains('typo-preview')) {
+                        const tag = btn.dataset.tag;
+                        const font = decodeURIComponent(btn.dataset.font);
+                        const size = btn.dataset.size;
+                        const weight = btn.dataset.weight;
+                        const lineHeight = btn.dataset.lineHeight;
+                        const results = await chrome.scripting.executeScript({
+                            target: { tabId: currentTab.id },
+                            function: getTypographySamples,
+                            args: [tag, font, size, weight, lineHeight]
+                        });
+                        const samples = results[0].result || [];
+                        let insertAfter = preview;
+                        samples.slice(1).forEach(text => {
+                            const el = document.createElement('div');
+                            el.className = 'typo-preview typo-preview-instance';
+                            el.style.cssText = preview.style.cssText;
+                            el.style.display = 'block';
+                            el.textContent = text;
+                            insertAfter.after(el);
+                            insertAfter = el;
+                        });
+                    }
                 }
             });
         });
@@ -827,6 +880,30 @@ function detectTypography() {
 
     // Drop empty "Other" if semantic tags covered everything
     return groups.filter(g => g.styles.length > 0);
+}
+
+// Content script function: Get text samples from all elements matching a typography style
+function getTypographySamples(tag, fontFamily, size, weight, lineHeight) {
+    const elements = document.querySelectorAll(tag);
+    const samples = [];
+    elements.forEach(element => {
+        const cs = window.getComputedStyle(element);
+        if (cs.fontFamily !== fontFamily) return;
+        if (cs.fontSize !== size) return;
+        if (cs.fontWeight !== weight) return;
+        if (cs.lineHeight !== lineHeight) return;
+        if (!element.textContent.trim()) return;
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const tw = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+            acceptNode: n => n.textContent.trim().length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+        });
+        const firstText = tw.nextNode();
+        if (firstText) {
+            samples.push(firstText.textContent.trim().slice(0, 60));
+        }
+    });
+    return samples;
 }
 
 // Content script function: Extract @font-face rules from page stylesheets
