@@ -151,6 +151,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const n = parseFloat(v);
             return isNaN(n) ? v : n % 1 === 0 ? `${n}px` : `${+n.toFixed(2)}px`;
         };
+        const lineHeightRatio = (lh, size) => {
+            const lhN = parseFloat(lh);
+            const sizeN = parseFloat(size);
+            if (isNaN(lhN) || isNaN(sizeN) || sizeN === 0) return lh;
+            const ratio = lhN / sizeN;
+            return ratio % 1 === 0 ? `${ratio}` : `${+ratio.toFixed(2)}`;
+        };
 
         fontList.innerHTML = typoGroups.map(group => `
             <div class="typo-group">
@@ -158,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${group.styles.map(style => `
                     <div class="typo-row" data-tag="${style.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">
                         <span class="typo-row-tag">${style.tag}</span>
-                        <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${roundPx(style.lineHeight)} / ${style.displayName}</span>
+                        <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${lineHeightRatio(style.lineHeight, style.size)} / ${style.displayName}</span>
                         <span class="typo-count">&times;${style.count}</span>
                     </div>
                 `).join('')}
