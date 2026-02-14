@@ -163,10 +163,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         fontList.innerHTML = `
             <div class="typo-options">
-                <label class="typo-checkbox">
-                    <input type="checkbox" ${lineHeightMode === 'ratio' ? 'checked' : ''}>
-                    <span>Line height as ratio</span>
-                </label>
+                <span class="typo-options-label">Line height</span>
+                <div class="typo-toggle">
+                    <button class="typo-toggle-btn ${lineHeightMode === 'ratio' ? 'active' : ''}" data-mode="ratio">Ratio</button>
+                    <button class="typo-toggle-btn ${lineHeightMode === 'original' ? 'active' : ''}" data-mode="original">px</button>
+                </div>
             </div>
         ` + typoGroups.map(group => `
             <div class="typo-group">
@@ -182,9 +183,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         `).join('');
 
         // Line height mode toggle
-        fontList.querySelector('.typo-checkbox input').addEventListener('change', (e) => {
-            lineHeightMode = e.target.checked ? 'ratio' : 'original';
-            displayTypography(typoGroups);
+        document.querySelectorAll('.typo-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                lineHeightMode = btn.dataset.mode;
+                displayTypography(typoGroups);
+            });
         });
 
         // Click to highlight matching elements

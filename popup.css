@@ -202,22 +202,41 @@ body {
 }
 
 .typo-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 10px;
 }
 
-.typo-checkbox {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+.typo-options-label {
     font-size: 11px;
-    color: #888;
-    cursor: pointer;
-    user-select: none;
+    color: #999;
+    font-weight: 500;
 }
 
-.typo-checkbox input {
-    accent-color: #007acc;
-    margin: 0;
+.typo-toggle {
+    display: flex;
+    background: #f0f0f0;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.typo-toggle-btn {
+    padding: 3px 10px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 550;
+    color: #777;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.typo-toggle-btn.active {
+    background: #fff;
+    color: #1a1a1a;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* Typography view styles */
