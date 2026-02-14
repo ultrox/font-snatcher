@@ -7,7 +7,7 @@
     // Clean up any existing highlights on page load/refresh
     function cleanup() {
         document.querySelectorAll(
-            '.wff-highlight-focus, .wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast, .wff-jump-tooltip'
+            '.wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast, .wff-jump-tooltip'
         ).forEach(el => el.remove());
         document.querySelectorAll('.wff-anchored').forEach(el => {
             el.style.anchorName = '';

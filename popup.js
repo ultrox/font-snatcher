@@ -559,6 +559,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
+        // Hover row to highlight matching elements on page
+        let hoverHighlightActive = false;
+        document.querySelectorAll('.typo-row').forEach(row => {
+            row.addEventListener('mouseenter', async () => {
+                if (row.classList.contains('active')) return;
+                hoverHighlightActive = true;
+                const tag = row.dataset.tag;
+                const font = decodeURIComponent(row.dataset.font);
+                const size = row.dataset.size;
+                const weight = row.dataset.weight;
+                const lineHeight = row.dataset.lineHeight;
+                const textTransform = row.dataset.textTransform;
+                const letterSpacing = row.dataset.letterSpacing;
+                await highlightTypographyElements(tag, font, size, weight, lineHeight, textTransform, letterSpacing);
+            });
+            row.addEventListener('mouseleave', async () => {
+                if (!hoverHighlightActive) return;
+                hoverHighlightActive = false;
+                // Only clear if no row is click-selected
+                if (!document.querySelector('.typo-row.active')) {
+                    await clearHighlights();
+                } else {
+                    // Restore the click-selected row's highlight
+                    const active = document.querySelector('.typo-row.active');
+                    const tag = active.dataset.tag;
+                    const font = decodeURIComponent(active.dataset.font);
+                    const size = active.dataset.size;
+                    const weight = active.dataset.weight;
+                    const lineHeight = active.dataset.lineHeight;
+                    const textTransform = active.dataset.textTransform;
+                    const letterSpacing = active.dataset.letterSpacing;
+                    await highlightTypographyElements(tag, font, size, weight, lineHeight, textTransform, letterSpacing);
+                }
+            });
+        });
+
         // Click count button to expand/collapse all instances
         document.querySelectorAll('.typo-count').forEach(btn => {
             btn.addEventListener('click', async (e) => {
@@ -789,7 +825,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await chrome.scripting.executeScript({
                 target: { tabId: currentTab.id },
                 function: () => {
-                    document.querySelectorAll('.wff-highlight-focus, .wff-jump-tooltip').forEach(el => el.remove());
+                    document.querySelectorAll('.wff-jump-tooltip').forEach(el => el.remove());
                     document.querySelectorAll('.wff-anchored').forEach(el => {
                         el.style.outline = '';
                         el.style.outlineOffset = '';
@@ -1242,7 +1278,7 @@ function extractFontFaces() {
 
 // Content script function: Highlight elements matching a specific typography combination
 function highlightTypographyMatches(tag, fontFamily, size, weight, lineHeight, textTransform, letterSpacing) {
-    document.querySelectorAll('.wff-highlight-focus, .wff-jump-tooltip').forEach(el => el.remove());
+    document.querySelectorAll('.wff-jump-tooltip').forEach(el => el.remove());
     document.querySelectorAll('.wff-anchored').forEach(el => {
         el.style.outline = '';
         el.style.outlineOffset = '';
@@ -1292,8 +1328,14 @@ function highlightTypographyMatches(tag, fontFamily, size, weight, lineHeight, t
 // Content script function: Scroll to and highlight a specific element with a distinct focus style
 function scrollToTypographyElement(tag, fontFamily, size, weight, lineHeight, textTransform, letterSpacing, elementIndex) {
     // Remove previous focus highlight and tooltip
-    document.querySelectorAll('.wff-highlight-focus, .wff-jump-tooltip').forEach(el => el.remove());
-    document.querySelectorAll('.wff-focused').forEach(el => el.classList.remove('wff-focused'));
+    document.querySelectorAll('.wff-jump-tooltip').forEach(el => el.remove());
+    document.querySelectorAll('.wff-focused').forEach(el => {
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+        el.style.boxShadow = '';
+        el.style.borderRadius = '';
+        el.classList.remove('wff-focused');
+    });
 
     const elements = document.querySelectorAll(tag);
     let i = 0;
@@ -1323,33 +1365,16 @@ function scrollToTypographyElement(tag, fontFamily, size, weight, lineHeight, te
 
     if (!target) return;
 
-    // Ensure group highlights exist (in case row wasn't clicked first)
+    // Mark as anchored for cleanup tracking
     if (!target.classList.contains('wff-anchored')) {
-        const anchor = `--wff-a-focus`;
-        target.style.anchorName = anchor;
         target.classList.add('wff-anchored');
     }
 
     target.classList.add('wff-focused');
-    const anchor = target.style.anchorName;
-
-    const focusEl = document.createElement('div');
-    focusEl.className = 'wff-highlight-focus';
-    focusEl.style.cssText = `
-        position: absolute;
-        position-anchor: ${anchor};
-        top: anchor(top);
-        left: anchor(left);
-        width: anchor-size(width);
-        height: anchor-size(height);
-        background-color: rgba(255, 149, 0, 0.12);
-        border: 2px solid rgba(255, 149, 0, 0.9);
-        pointer-events: none;
-        z-index: 1000000;
-        border-radius: 6px;
-        box-sizing: border-box;
-    `;
-    document.body.appendChild(focusEl);
+    target.style.outline = '2px solid rgba(255, 149, 0, 0.9)';
+    target.style.outlineOffset = '-2px';
+    target.style.boxShadow = 'inset 0 0 0 1000px rgba(255, 149, 0, 0.12)';
+    target.style.borderRadius = '6px';
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     // Show inspector tooltip on the target element
@@ -1406,8 +1431,14 @@ function scrollToTypographyElement(tag, fontFamily, size, weight, lineHeight, te
 
 // Content script function: Remove only the focused highlight and tooltip
 function clearFocusedHighlight() {
-    document.querySelectorAll('.wff-highlight-focus, .wff-jump-tooltip').forEach(el => el.remove());
-    document.querySelectorAll('.wff-focused').forEach(el => el.classList.remove('wff-focused'));
+    document.querySelectorAll('.wff-jump-tooltip').forEach(el => el.remove());
+    document.querySelectorAll('.wff-focused').forEach(el => {
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+        el.style.boxShadow = '';
+        el.style.borderRadius = '';
+        el.classList.remove('wff-focused');
+    });
 }
 
 // Content script function: Get computed style properties of a matched element

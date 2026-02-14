@@ -36,7 +36,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Full cleanup function to be injected
 function cleanupAll() {
     // Remove highlights, tooltips, toasts
-    document.querySelectorAll('.wff-highlight-focus, .wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast, .wff-jump-tooltip')
+    document.querySelectorAll('.wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast, .wff-jump-tooltip')
         .forEach(el => el.remove());
 
     // Remove highlight styles and anchor names
