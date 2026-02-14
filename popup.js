@@ -229,6 +229,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!wasExpanded) {
                     btn.classList.add('expanded');
                     row.classList.add('typo-row-sticky');
+
+                    // Select the row and highlight on page
+                    document.querySelectorAll('.typo-row.active').forEach(r => r.classList.remove('active'));
+                    row.classList.add('active');
+                    const tag = btn.dataset.tag;
+                    const font = decodeURIComponent(btn.dataset.font);
+                    const hSize = btn.dataset.size;
+                    const hWeight = btn.dataset.weight;
+                    const hLineHeight = btn.dataset.lineHeight;
+                    const hTextTransform = btn.dataset.textTransform;
+                    const hLetterSpacing = btn.dataset.letterSpacing;
+                    await highlightTypographyElements(tag, font, hSize, hWeight, hLineHeight, hTextTransform, hLetterSpacing);
+
+                    // Scroll row to top of font-list
+                    const listRect = fontList.getBoundingClientRect();
+                    const rowRect = row.getBoundingClientRect();
+                    fontList.scrollBy({ top: rowRect.top - listRect.top - 14, behavior: 'smooth' });
                     const preview = row.nextElementSibling;
                     if (preview && preview.classList.contains('typo-preview')) {
                         const tag = btn.dataset.tag;
@@ -394,16 +411,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                 text = lines.join('\n');
             } else {
                 const cleanFont = styles.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+                const camelCase = (s) => s.trim().split(/\s+/).map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
                 const numKey = (v) => parseFloat(v) || v;
-                const tokens = {
-                    'font-family': { [cleanFont.toLowerCase()]: { type: 'string', value: cleanFont } },
-                    'font-weight': { [styles.fontWeight]: { type: 'dimension', value: styles.fontWeight } },
-                    'font-size': { [numKey(styles.fontSize)]: { type: 'dimension', value: styles.fontSize } },
-                    'line-height': { [numKey(styles.lineHeight)]: { type: 'dimension', value: styles.lineHeight } },
-                    'letter-spacing': { [numKey(styles.letterSpacing)]: { type: 'dimension', value: styles.letterSpacing } },
-                    'text-transform': { [styles.textTransform]: { type: 'string', value: styles.textTransform } }
+                const letterSpacingNames = {
+                    '0px': '0', 'normal': '0',
+                    '0.5px': 'half', '-0.5px': 'minus-half',
+                    '1px': '1', '-1px': 'minus-1',
+                    '1.5px': '1-half', '-1.5px': 'minus-1-half',
+                    '2px': '2', '-2px': 'minus-2'
                 };
-                text = JSON.stringify(tokens, null, 2);
+                const lsValue = styles.letterSpacing;
+                const lsKey = letterSpacingNames[lsValue] || numKey(lsValue);
+                const j = (v) => JSON.stringify(v);
+                text = `{
+  // family
+  ${j(camelCase(cleanFont))}: { "type": "string", "value": ${j(cleanFont)} },
+  // weight
+  ${j(String(styles.fontWeight))}: { "type": "dimension", "value": ${j(styles.fontWeight)} },
+  // size
+  ${j(String(numKey(styles.fontSize)))}: { "type": "dimension", "value": ${j(styles.fontSize)} },
+  // line-height
+  ${j(String(numKey(styles.lineHeight)))}: { "type": "dimension", "value": ${j(styles.lineHeight)} },
+  // letter-spacing
+  ${j(String(lsKey))}: { "type": "dimension", "value": ${j(lsValue)} },
+  // text-transform
+  ${j(styles.textTransform)}: { "type": "string", "value": ${j(styles.textTransform)} }
+}`;
             }
 
             await navigator.clipboard.writeText(text);
