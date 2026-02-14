@@ -38,38 +38,6 @@ body {
     letter-spacing: -0.3px;
 }
 
-.tab-bar {
-    display: flex;
-    gap: 0;
-    margin-bottom: 8px;
-    background: #f0f0f0;
-    border-radius: 10px;
-    padding: 3px;
-}
-
-.tab {
-    flex: 1;
-    padding: 6px 0;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    font-size: 12px;
-    font-weight: 550;
-    color: #777;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.tab:hover:not(.active) {
-    color: #444;
-}
-
-.tab.active {
-    background: #fff;
-    color: #1a1a1a;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
 .font-count {
     font-size: 12px;
     color: #888;
@@ -116,89 +84,6 @@ body {
     padding: 12px;
     max-height: 430px;
     overflow-y: auto;
-}
-
-/* Font group styles */
-.font-group {
-    padding: 14px 16px;
-    border-radius: 14px;
-    margin-bottom: 10px;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.font-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.font-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: #1a1a1a;
-    letter-spacing: -0.2px;
-}
-
-.font-total {
-    font-size: 11px;
-    background: linear-gradient(135deg, #e8f4ff 0%, #d4ebff 100%);
-    color: #0066b3;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-weight: 600;
-}
-
-/* Tag chip styles */
-.tag-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.tag-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background: #f5f5f5;
-    border: none;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #666;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.tag-chip:hover {
-    background: #e8f4ff;
-    color: #007acc;
-    transform: translateY(-1px);
-}
-
-.tag-chip.active {
-    background: linear-gradient(135deg, #007acc 0%, #0066b3 100%);
-    color: white;
-    box-shadow: 0 3px 10px rgba(0, 122, 204, 0.25);
-}
-
-.tag-chip.active .tag-count {
-    background: rgba(255, 255, 255, 0.25);
-    color: white;
-}
-
-.tag-count {
-    font-size: 10px;
-    font-weight: 600;
-    background: #e0e0e0;
-    color: #777;
-    padding: 2px 6px;
-    border-radius: 10px;
-    min-width: 18px;
-    text-align: center;
 }
 
 .typo-toolbar {

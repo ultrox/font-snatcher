@@ -22,7 +22,7 @@
    "content_security_policy": {
       "extension_pages": "script-src 'self'; object-src 'self'"
    },
-   "description": "Identify and inspect fonts on any website.",
+   "description": "Inspect and preview typography on any website.",
    "icons": {
       "128": "images/icon_128.png",
       "16": "images/icon_16.png",
@@ -31,7 +31,7 @@
    },
    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjhdNIO6utZy6XeD+DulqP5L0xRV0eAyQITI8xBiL2eX/H/eC8IirXVYrz3O1CZ2dGPzcGPtomMkf0lt/WViUa6c18H4LL86YjJYPshLFT+eqUgB+Nn5w73aFDfGxmybswiKyvE6Y+o6N9/pN3p4zobEQO3E1htmAXIepWLYY+ieYrHxjQ642iFEhn9xj2TsZBrVpAZukx1HOQqr1dPiYYIsahYDmNypep3oqnhteYXHYWvKpH7e8ipHa71WJJ4/mtSexrKCcw7Q4jM4L8gKJJt9o2fsu4wpaQGq9Z2BOid3SAOX2gmF1nByjilf/M1W9x24epsRlrTaV8qccOI3UKwIDAQAB",
    "manifest_version": 3,
-   "name": "Font Snatcher",
+   "name": "TypeLens",
    "permissions": [ "activeTab", "scripting" ],
    "update_url": "https://clients2.google.com/service/update2/crx",
    "version": "2.0.1",

@@ -5,8 +5,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let currentTab = null;
     let isInspectorActive = false;
-    let activeTab = 'typography';
-    let cachedFontGroups = null;
     let cachedTypographyGroups = null;
     let lineHeightMode = 'ratio';
     let typoSortMode = 'size';
@@ -35,11 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadFontData(tabId) {
         try {
-            const [fontResults, typoResults, fontFaceResults] = await Promise.all([
-                chrome.scripting.executeScript({
-                    target: { tabId },
-                    function: detectFontsByElement
-                }),
+            const [typoResults, fontFaceResults] = await Promise.all([
                 chrome.scripting.executeScript({
                     target: { tabId },
                     function: detectTypography
@@ -50,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 })
             ]);
 
-            cachedFontGroups = fontResults[0].result;
             cachedTypographyGroups = typoResults[0].result;
 
             const fontFaceCSS = fontFaceResults[0].result;
@@ -60,95 +53,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 document.head.appendChild(style);
             }
 
-            renderActiveTab();
+            displayTypography(cachedTypographyGroups);
         } catch (error) {
             console.error('Error loading font data:', error);
             showErrorMessage();
         }
-    }
-
-    function renderActiveTab() {
-        if (activeTab === 'fonts') {
-            displayFonts(cachedFontGroups);
-        } else {
-            displayTypography(cachedTypographyGroups);
-        }
-    }
-
-    // Tab switching
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            if (tab.dataset.tab === activeTab) return;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            activeTab = tab.dataset.tab;
-            renderActiveTab();
-        });
-    });
-
-    function displayFonts(fontGroups) {
-        if (!fontGroups || fontGroups.length === 0) {
-            fontList.innerHTML = '<div class="no-fonts">No fonts detected on this page</div>';
-            fontCountText.textContent = '0 fonts found';
-            return;
-        }
-
-        fontCountText.textContent = `${fontGroups.length} font${fontGroups.length === 1 ? '' : 's'} found`;
-
-        fontList.innerHTML = fontGroups.map(group => `
-            <div class="font-group" data-font="${encodeURIComponent(group.font)}">
-                <div class="font-header">
-                    <span class="font-name" style="font-family: ${group.font}">${group.displayName}</span>
-                    <span class="font-total">${group.totalCount}</span>
-                </div>
-                <div class="tag-list">
-                    ${group.tags.map(tag => `
-                        <span class="tag-chip" data-tag="${tag.name}" data-font="${encodeURIComponent(group.font)}">
-                            ${tag.name}
-                            <span class="tag-count">${tag.count}</span>
-                        </span>
-                    `).join('')}
-                </div>
-            </div>
-        `).join('');
-
-        // Tag chip click: lock highlight + show copy bar
-        document.querySelectorAll('.tag-chip').forEach(chip => {
-            chip.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const tag = chip.dataset.tag;
-                const font = decodeURIComponent(chip.dataset.font);
-
-                const wasActive = chip.classList.contains('active');
-                document.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('active'));
-
-                if (!wasActive) {
-                    chip.classList.add('active');
-                    await highlightAndScrollTo(font, [tag]);
-                } else {
-                    highlightElements(font, [tag], false);
-                }
-            });
-        });
-
-        // Highlight on tag chip hover
-        document.querySelectorAll('.font-group').forEach(group => {
-            group.addEventListener('mouseover', (e) => {
-                if (document.querySelector('.tag-chip.active')) return;
-                const chip = e.target.closest('.tag-chip');
-                if (chip) {
-                    const font = decodeURIComponent(group.dataset.font);
-                    highlightElements(font, [chip.dataset.tag], true);
-                }
-            });
-
-            group.addEventListener('mouseleave', () => {
-                if (document.querySelector('.tag-chip.active')) return;
-                const font = decodeURIComponent(group.dataset.font);
-                const tags = Array.from(group.querySelectorAll('.tag-chip')).map(c => c.dataset.tag);
-                highlightElements(font, tags, false);
-            });
-        });
     }
 
     function displayTypography(typoGroups) {
@@ -339,39 +248,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!currentTab) return;
             await chrome.scripting.executeScript({
                 target: { tabId: currentTab.id },
-                function: toggleHighlight,
-                args: ['', [], false]
+                function: () => {
+                    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
+                    document.querySelectorAll('.wff-anchored').forEach(el => {
+                        el.style.anchorName = '';
+                        el.classList.remove('wff-anchored');
+                    });
+                }
             });
         } catch (error) {
             console.error('Error clearing highlights:', error);
-        }
-    }
-
-    async function highlightElements(fontFamily, tags, highlight) {
-        try {
-            if (!currentTab) return;
-
-            await chrome.scripting.executeScript({
-                target: { tabId: currentTab.id },
-                function: toggleHighlight,
-                args: [fontFamily, tags, highlight]
-            });
-        } catch (error) {
-            console.error('Error highlighting elements:', error);
-        }
-    }
-
-    async function highlightAndScrollTo(fontFamily, tags) {
-        try {
-            if (!currentTab) return;
-
-            await chrome.scripting.executeScript({
-                target: { tabId: currentTab.id },
-                function: highlightAndScroll,
-                args: [fontFamily, tags]
-            });
-        } catch (error) {
-            console.error('Error highlighting elements:', error);
         }
     }
 
@@ -405,208 +291,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function showErrorMessage() {
-        fontList.innerHTML = '<div class="no-fonts">Error loading fonts</div>';
+        fontList.innerHTML = '<div class="no-fonts">Error loading typography</div>';
         fontCountText.textContent = 'Error';
     }
 });
-
-// Content script function: Detects fonts grouped by font family with tag breakdown
-function detectFontsByElement() {
-    const TAG_PRIORITY = { 'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6, 'p': 7, 'span': 8, 'a': 9, 'li': 10, 'div': 11 };
-    const SEMANTIC = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'td', 'th', 'label', 'button']);
-    const RELEVANT = new Set([...SEMANTIC, 'span', 'div', 'a']);
-    const fontMap = new Map();
-    const counted = new Set();
-
-    // Walk every visible text node and attribute it to the best ancestor:
-    // climb from the text's parent toward the root, preferring semantic tags
-    // (h1-h6, p, li …) over wrappers (span, div, a). Stop climbing when
-    // the font-family diverges so inner overrides are still captured.
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-        acceptNode: n => n.textContent.trim().length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
-    });
-
-    while (walker.nextNode()) {
-        const parent = walker.currentNode.parentElement;
-        if (!parent) continue;
-
-        const computedStyle = window.getComputedStyle(parent);
-        const fontFamily = computedStyle.fontFamily;
-        if (!fontFamily) continue;
-
-        // Visibility checks on the actual text container
-        const rect = parent.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) continue;
-        if (computedStyle.display === 'none') continue;
-        if (computedStyle.visibility === 'hidden') continue;
-        if (computedStyle.opacity === '0') continue;
-
-        // Walk up to find the best element to attribute this text to
-        let target = null;
-        let el = parent;
-        while (el && el !== document.documentElement) {
-            const tag = el.tagName.toLowerCase();
-            if (RELEVANT.has(tag)) {
-                const elFont = (el === parent) ? fontFamily : window.getComputedStyle(el).fontFamily;
-                if (elFont === fontFamily) {
-                    target = el;
-                    if (SEMANTIC.has(tag)) break;
-                } else {
-                    break;
-                }
-            }
-            el = el.parentElement;
-        }
-
-        if (!target || counted.has(target)) continue;
-        counted.add(target);
-
-        const tagName = target.tagName.toLowerCase();
-
-        if (!fontMap.has(fontFamily)) {
-            fontMap.set(fontFamily, {
-                font: fontFamily,
-                displayName: fontFamily.split(',')[0].replace(/['"]/g, '').trim(),
-                tagCounts: new Map(),
-                totalCount: 0
-            });
-        }
-
-        const entry = fontMap.get(fontFamily);
-        entry.tagCounts.set(tagName, (entry.tagCounts.get(tagName) || 0) + 1);
-        entry.totalCount++;
-    }
-
-    // Convert to array and format
-    const groups = Array.from(fontMap.values()).map(group => {
-        const tags = Array.from(group.tagCounts.entries())
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => {
-                const aPriority = TAG_PRIORITY[a.name] || 999;
-                const bPriority = TAG_PRIORITY[b.name] || 999;
-                return aPriority - bPriority;
-            });
-
-        return {
-            font: group.font,
-            displayName: group.displayName,
-            tags: tags,
-            totalCount: group.totalCount
-        };
-    });
-
-    // Sort groups: those with headings first, then by total count
-    groups.sort((a, b) => {
-        const aHasHeading = a.tags.some(t => t.name.match(/^h[1-6]$/));
-        const bHasHeading = b.tags.some(t => t.name.match(/^h[1-6]$/));
-
-        if (aHasHeading && !bHasHeading) return -1;
-        if (!aHasHeading && bHasHeading) return 1;
-
-        return b.totalCount - a.totalCount;
-    });
-
-    return groups;
-}
-
-// Content script function: Toggle element highlighting
-function toggleHighlight(fontFamily, tags, highlight) {
-    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
-    document.querySelectorAll('.wff-anchored').forEach(el => {
-        el.style.anchorName = '';
-        el.classList.remove('wff-anchored');
-    });
-
-    if (!highlight) return;
-
-    const selector = tags.join(', ');
-    const elements = document.querySelectorAll(selector);
-    let i = 0;
-
-    elements.forEach(element => {
-        const computedStyle = window.getComputedStyle(element);
-        if (computedStyle.fontFamily !== fontFamily) return;
-        if (!element.textContent.trim()) return;
-
-        const rect = element.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-
-        const anchor = `--wff-a-${i++}`;
-        element.style.anchorName = anchor;
-        element.classList.add('wff-anchored');
-
-        const highlightEl = document.createElement('div');
-        highlightEl.className = 'wff-highlight';
-        highlightEl.style.cssText = `
-            position: absolute;
-            position-anchor: ${anchor};
-            top: anchor(top);
-            left: anchor(left);
-            width: anchor-size(width);
-            height: anchor-size(height);
-            background-color: rgba(0, 122, 204, 0.12);
-            border: 2px solid rgba(0, 122, 204, 0.6);
-            pointer-events: none;
-            z-index: 999999;
-            border-radius: 8px;
-            box-sizing: border-box;
-        `;
-        document.body.appendChild(highlightEl);
-    });
-}
-
-// Content script function: Highlight and scroll to first element
-function highlightAndScroll(fontFamily, tags) {
-    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
-    document.querySelectorAll('.wff-anchored').forEach(el => {
-        el.style.anchorName = '';
-        el.classList.remove('wff-anchored');
-    });
-
-    const selector = tags.join(', ');
-    const elements = document.querySelectorAll(selector);
-    let firstElement = null;
-    let i = 0;
-
-    elements.forEach(element => {
-        const computedStyle = window.getComputedStyle(element);
-        if (computedStyle.fontFamily !== fontFamily) return;
-        if (!element.textContent.trim()) return;
-
-        const rect = element.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-
-        if (!firstElement) {
-            firstElement = element;
-        }
-
-        const anchor = `--wff-a-${i++}`;
-        element.style.anchorName = anchor;
-        element.classList.add('wff-anchored');
-
-        const highlightEl = document.createElement('div');
-        highlightEl.className = 'wff-highlight';
-        highlightEl.style.cssText = `
-            position: absolute;
-            position-anchor: ${anchor};
-            top: anchor(top);
-            left: anchor(left);
-            width: anchor-size(width);
-            height: anchor-size(height);
-            background-color: rgba(0, 122, 204, 0.15);
-            border: 2px solid rgba(0, 122, 204, 0.7);
-            pointer-events: none;
-            z-index: 999999;
-            border-radius: 6px;
-            box-sizing: border-box;
-        `;
-        document.body.appendChild(highlightEl);
-    });
-
-    if (firstElement) {
-        firstElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-}
 
 // Content script function: Enable inspector mode (self-contained with inline handlers)
 function enableInspectorMode() {

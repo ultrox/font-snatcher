@@ -1,4 +1,4 @@
-// Font Snatcher Content Script
+// TypeLens Content Script
 // Minimal setup - main functionality is injected via popup.js executeScript
 
 (function() {

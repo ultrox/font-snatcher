@@ -1,7 +1,7 @@
-// Font Snatcher Background Script (Service Worker)
+// TypeLens Background Script (Service Worker)
 
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('Font Snatcher extension installed');
+    console.log('TypeLens extension installed');
 });
 
 // Clean up when popup closes (port disconnects)
