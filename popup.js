@@ -394,14 +394,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 text = lines.join('\n');
             } else {
                 const cleanFont = styles.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+                const numKey = (v) => parseFloat(v) || v;
                 const tokens = {
-                    'font-family': { type: 'string', value: cleanFont },
-                    'font-weight': { type: 'dimension', value: styles.fontWeight },
-                    'font-size': { type: 'dimension', value: styles.fontSize },
-                    'line-height': { type: 'dimension', value: styles.lineHeight },
-                    'letter-spacing': { type: 'dimension', value: styles.letterSpacing },
-                    'text-transform': { type: 'string', value: styles.textTransform },
-                    'color': { type: 'string', value: styles.color }
+                    'font-family': { [cleanFont.toLowerCase()]: { type: 'string', value: cleanFont } },
+                    'font-weight': { [styles.fontWeight]: { type: 'dimension', value: styles.fontWeight } },
+                    'font-size': { [numKey(styles.fontSize)]: { type: 'dimension', value: styles.fontSize } },
+                    'line-height': { [numKey(styles.lineHeight)]: { type: 'dimension', value: styles.lineHeight } },
+                    'letter-spacing': { [numKey(styles.letterSpacing)]: { type: 'dimension', value: styles.letterSpacing } },
+                    'text-transform': { [styles.textTransform]: { type: 'string', value: styles.textTransform } }
                 };
                 text = JSON.stringify(tokens, null, 2);
             }
