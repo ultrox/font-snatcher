@@ -88,17 +88,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        // Single mouseover/mouseleave on font groups handles both card and chip hover
+        // Highlight on tag chip hover
         document.querySelectorAll('.font-group').forEach(group => {
             group.addEventListener('mouseover', (e) => {
                 if (document.querySelector('.tag-chip.active')) return;
-                const font = decodeURIComponent(group.dataset.font);
                 const chip = e.target.closest('.tag-chip');
                 if (chip) {
+                    const font = decodeURIComponent(group.dataset.font);
                     highlightElements(font, [chip.dataset.tag], true);
-                } else if (!e.target.closest('.tag-list')) {
-                    const tags = Array.from(group.querySelectorAll('.tag-chip')).map(c => c.dataset.tag);
-                    highlightElements(font, tags, true);
                 }
             });
 
@@ -177,25 +174,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Content script function: Detects fonts grouped by font family with tag breakdown
 function detectFontsByElement() {
     const TAG_PRIORITY = { 'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6, 'p': 7, 'span': 8, 'a': 9, 'li': 10, 'div': 11 };
+    const SEMANTIC = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'td', 'th', 'label', 'button']);
+    const RELEVANT = new Set([...SEMANTIC, 'span', 'div', 'a']);
     const fontMap = new Map();
-    const textElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div, a, li, td, th, label, button');
+    const counted = new Set();
 
-    textElements.forEach(element => {
-        const computedStyle = window.getComputedStyle(element);
-        const hasDirectText = Array.from(element.childNodes).some(
-            node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
-        );
+    // Walk every visible text node and attribute it to the best ancestor:
+    // climb from the text's parent toward the root, preferring semantic tags
+    // (h1-h6, p, li …) over wrappers (span, div, a). Stop climbing when
+    // the font-family diverges so inner overrides are still captured.
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => n.textContent.trim().length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    });
 
-        if (!hasDirectText || !computedStyle.fontFamily) return;
+    while (walker.nextNode()) {
+        const parent = walker.currentNode.parentElement;
+        if (!parent) continue;
 
-        const rect = element.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        if (computedStyle.display === 'none') return;
-        if (computedStyle.visibility === 'hidden') return;
-        if (computedStyle.opacity === '0') return;
-
+        const computedStyle = window.getComputedStyle(parent);
         const fontFamily = computedStyle.fontFamily;
-        const tagName = element.tagName.toLowerCase();
+        if (!fontFamily) continue;
+
+        // Visibility checks on the actual text container
+        const rect = parent.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        if (computedStyle.display === 'none') continue;
+        if (computedStyle.visibility === 'hidden') continue;
+        if (computedStyle.opacity === '0') continue;
+
+        // Walk up to find the best element to attribute this text to
+        let target = null;
+        let el = parent;
+        while (el && el !== document.documentElement) {
+            const tag = el.tagName.toLowerCase();
+            if (RELEVANT.has(tag)) {
+                const elFont = (el === parent) ? fontFamily : window.getComputedStyle(el).fontFamily;
+                if (elFont === fontFamily) {
+                    target = el;
+                    if (SEMANTIC.has(tag)) break;
+                } else {
+                    break;
+                }
+            }
+            el = el.parentElement;
+        }
+
+        if (!target || counted.has(target)) continue;
+        counted.add(target);
+
+        const tagName = target.tagName.toLowerCase();
 
         if (!fontMap.has(fontFamily)) {
             fontMap.set(fontFamily, {
@@ -209,7 +236,7 @@ function detectFontsByElement() {
         const entry = fontMap.get(fontFamily);
         entry.tagCounts.set(tagName, (entry.tagCounts.get(tagName) || 0) + 1);
         entry.totalCount++;
-    });
+    }
 
     // Convert to array and format
     const groups = Array.from(fontMap.values()).map(group => {
@@ -260,11 +287,7 @@ function toggleHighlight(fontFamily, tags, highlight) {
     elements.forEach(element => {
         const computedStyle = window.getComputedStyle(element);
         if (computedStyle.fontFamily !== fontFamily) return;
-
-        const hasDirectText = Array.from(element.childNodes).some(
-            node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
-        );
-        if (!hasDirectText) return;
+        if (!element.textContent.trim()) return;
 
         const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return;
@@ -309,11 +332,7 @@ function highlightAndScroll(fontFamily, tags) {
     elements.forEach(element => {
         const computedStyle = window.getComputedStyle(element);
         if (computedStyle.fontFamily !== fontFamily) return;
-
-        const hasDirectText = Array.from(element.childNodes).some(
-            node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
-        );
-        if (!hasDirectText) return;
+        if (!element.textContent.trim()) return;
 
         const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return;
