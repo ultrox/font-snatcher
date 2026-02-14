@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadFontData(tabId) {
         try {
-            const [fontResults, typoResults] = await Promise.all([
+            const [fontResults, typoResults, fontFaceResults] = await Promise.all([
                 chrome.scripting.executeScript({
                     target: { tabId },
                     function: detectFontsByElement
@@ -43,11 +43,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 chrome.scripting.executeScript({
                     target: { tabId },
                     function: detectTypography
+                }),
+                chrome.scripting.executeScript({
+                    target: { tabId },
+                    function: extractFontFaces
                 })
             ]);
 
             cachedFontGroups = fontResults[0].result;
             cachedTypographyGroups = typoResults[0].result;
+
+            const fontFaceCSS = fontFaceResults[0].result;
+            if (fontFaceCSS) {
+                const style = document.createElement('style');
+                style.textContent = fontFaceCSS;
+                document.head.appendChild(style);
+            }
+
             renderActiveTab();
         } catch (error) {
             console.error('Error loading font data:', error);
@@ -191,14 +203,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         ` + sorted.map(group => `
             <div class="typo-group">
-                <div class="typo-classifier">${group.classifier}</div>
-                ${group.styles.map(style => `
+                <div class="typo-classifier">
+                    <span>${group.classifier}</span>
+                    <button class="typo-preview-toggle">Preview</button>
+                </div>
+                ${group.styles.map(style => {
+                    const previewFont = style.font.replace(/"/g, "'");
+                    const previewSize = Math.min(parseFloat(style.size), 16);
+                    const escapedSample = (style.sample || 'The quick brown fox').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    return `
                     <div class="typo-row" data-tag="${style.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">
                         <span class="typo-row-tag">${style.tag}</span>
                         <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${fmtLineHeight(style.lineHeight, style.size)} / ${style.displayName}</span>
                         <span class="typo-count">&times;${style.count}</span>
                     </div>
-                `).join('')}
+                    <div class="typo-preview" style="font-family: ${previewFont}; font-size: ${previewSize}px; font-weight: ${style.weight}; line-height: ${style.lineHeight}">${escapedSample}</div>`;
+                }).join('')}
             </div>
         `).join('');
 
@@ -215,6 +235,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', () => {
                 lineHeightMode = btn.dataset.mode;
                 displayTypography(typoGroups);
+            });
+        });
+
+        // Preview toggle per card
+        document.querySelectorAll('.typo-preview-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const group = btn.closest('.typo-group');
+                group.classList.toggle('show-preview');
+                btn.classList.toggle('active');
             });
         });
 
@@ -772,7 +801,12 @@ function detectTypography() {
         }
         const styleMap = classifierMap.get(classifier);
         if (!styleMap.has(key)) {
-            styleMap.set(key, { tag, font: fontFamily, displayName, size, weight, lineHeight, count: 0 });
+            const tw = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, {
+                acceptNode: n => n.textContent.trim().length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+            });
+            const firstText = tw.nextNode();
+            const sample = firstText ? firstText.textContent.trim().slice(0, 60) : '';
+            styleMap.set(key, { tag, font: fontFamily, displayName, size, weight, lineHeight, count: 0, sample });
         }
         styleMap.get(key).count++;
     }
@@ -790,6 +824,21 @@ function detectTypography() {
 
     // Drop empty "Other" if semantic tags covered everything
     return groups.filter(g => g.styles.length > 0);
+}
+
+// Content script function: Extract @font-face rules from page stylesheets
+function extractFontFaces() {
+    const rules = [];
+    for (const sheet of document.styleSheets) {
+        try {
+            for (const rule of sheet.cssRules) {
+                if (rule instanceof CSSFontFaceRule) {
+                    rules.push(rule.cssText);
+                }
+            }
+        } catch (e) { /* cross-origin stylesheet, skip */ }
+    }
+    return rules.join('\n');
 }
 
 // Content script function: Highlight elements matching a specific typography combination
