@@ -161,7 +161,8 @@ body {
     gap: 4px;
 }
 
-.typo-group-copy-pill {
+.typo-group-copy-pill,
+.typo-all-copy-pill {
     padding: 2px 8px;
     border: 1px solid transparent;
     border-radius: 5px;
@@ -176,25 +177,29 @@ body {
     color: #777;
 }
 
-.typo-group-copy-pill[data-format="css"]:hover {
+.typo-group-copy-pill[data-format="css"]:hover,
+.typo-all-copy-pill[data-format="css"]:hover {
     background: #e8f4ff;
     border-color: #b3d9f7;
     color: #0066b3;
 }
 
-.typo-group-copy-pill[data-format="tokens"]:hover {
+.typo-group-copy-pill[data-format="tokens"]:hover,
+.typo-all-copy-pill[data-format="tokens"]:hover {
     background: #f0e8ff;
     border-color: #d4bffa;
     color: #6b3fa0;
 }
 
-.typo-group-copy-pill[data-format="css"].active {
+.typo-group-copy-pill[data-format="css"].active,
+.typo-all-copy-pill[data-format="css"].active {
     background: #e8f4ff;
     border-color: #007acc;
     color: #0066b3;
 }
 
-.typo-group-copy-pill[data-format="tokens"].active {
+.typo-group-copy-pill[data-format="tokens"].active,
+.typo-all-copy-pill[data-format="tokens"].active {
     background: #f0e8ff;
     border-color: #8b5cf6;
     color: #6b3fa0;
@@ -248,27 +253,68 @@ body {
     display: flex;
 }
 
-.typo-group-copy-btn {
+.typo-group-copy-btn,
+.typo-all-copy-btn {
     width: 100%;
     padding: 7px 0;
     margin-top: 8px;
     border: none;
     border-radius: 8px;
-    background: linear-gradient(135deg, #007acc 0%, #0066b3 100%);
-    color: white;
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 600;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
     cursor: pointer;
     transition: all 0.15s ease;
     position: relative;
+    /* default fallback */
+    background: #e0e0e0;
+    color: #555;
 }
 
-.typo-group-copy-btn:hover {
-    box-shadow: 0 2px 8px rgba(0, 122, 204, 0.3);
+.typo-all-copy-btn {
+    padding: 8px 0;
+    margin-top: 10px;
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+}
+
+/* CSS format */
+.typo-group[data-copy-format="css"] .typo-group-copy-btn,
+.font-list[data-copy-format="css"] .typo-all-copy-btn {
+    background: #e8f4ff;
+    border: 1px solid #b3d9f7;
+    color: #0066b3;
+}
+
+.typo-group[data-copy-format="css"] .typo-group-copy-btn:hover,
+.font-list[data-copy-format="css"] .typo-all-copy-btn:hover {
+    background: #d0eaff;
+    border-color: #007acc;
+    box-shadow: 0 2px 8px rgba(0, 122, 204, 0.15);
     transform: translateY(-1px);
 }
 
-.typo-group-copy-btn:disabled {
+/* Tokens format */
+.typo-group[data-copy-format="tokens"] .typo-group-copy-btn,
+.font-list[data-copy-format="tokens"] .typo-all-copy-btn {
+    background: #f0e8ff;
+    border: 1px solid #d4bffa;
+    color: #6b3fa0;
+}
+
+.typo-group[data-copy-format="tokens"] .typo-group-copy-btn:hover,
+.font-list[data-copy-format="tokens"] .typo-all-copy-btn:hover {
+    background: #e4d6ff;
+    border-color: #8b5cf6;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+    transform: translateY(-1px);
+}
+
+.typo-group-copy-btn:disabled,
+.typo-all-copy-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
     transform: none;

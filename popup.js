@@ -60,6 +60,98 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function formatStyles(allStyles, format) {
+        if (format === 'css') {
+            return allStyles.map(s => {
+                const lines = [`/* ${s.tag} */`];
+                lines.push(`font-family: ${s.fontFamily};`);
+                if (s.fontStyle !== 'normal') lines.push(`font-style: ${s.fontStyle};`);
+                lines.push(`font-weight: ${s.fontWeight};`);
+                lines.push(`font-size: ${s.fontSize};`);
+                lines.push(`line-height: ${s.lineHeight};`);
+                lines.push(`letter-spacing: ${s.letterSpacing};`);
+                lines.push(`text-transform: ${s.textTransform};`);
+                lines.push(`color: ${s.color};`);
+                return lines.join('\n');
+            }).join('\n\n');
+        }
+
+        const camelCase = (s) => s.trim().split(/\s+/).map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+        const numKey = (v) => { const n = parseFloat(v); return isNaN(n) ? v : String(n % 1 === 0 ? Math.round(n) : +n.toFixed(2)); };
+        const letterSpacingNames = {
+            '0px': '0', 'normal': '0',
+            '0.5px': 'half', '-0.5px': 'minus-half',
+            '1px': '1', '-1px': 'minus-1',
+            '1.5px': '1-half', '-1.5px': 'minus-1-half',
+            '2px': '2', '-2px': 'minus-2'
+        };
+
+        const groups = {
+            'font-family': {},
+            'font-weight': {},
+            'font-size': {},
+            'line-height': {},
+            'letter-spacing': {},
+            'text-transform': {}
+        };
+        allStyles.forEach(s => {
+            const cleanFont = s.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+            const lsKey = letterSpacingNames[s.letterSpacing] || numKey(s.letterSpacing);
+            groups['font-family'][camelCase(cleanFont)] = { type: 'string', value: cleanFont };
+            groups['font-weight'][String(s.fontWeight)] = { type: 'dimension', value: s.fontWeight };
+            groups['font-size'][numKey(s.fontSize)] = { type: 'dimension', value: s.fontSize };
+            groups['line-height'][numKey(s.lineHeight)] = { type: 'dimension', value: s.lineHeight };
+            groups['letter-spacing'][lsKey] = { type: 'dimension', value: s.letterSpacing };
+            groups['text-transform'][s.textTransform] = { type: 'string', value: s.textTransform };
+        });
+
+        const j = (v) => JSON.stringify(v);
+        const lines = ['{'];
+        const groupKeys = Object.keys(groups);
+        groupKeys.forEach((gk, gi) => {
+            lines.push(`  ${j(gk)}: {`);
+            const entries = Object.entries(groups[gk]);
+            entries.forEach(([k, v], i) => {
+                const comma = i < entries.length - 1 ? ',' : '';
+                lines.push(`    ${j(k)}: { "type": ${j(v.type)}, "value": ${j(v.value)} }${comma}`);
+            });
+            lines.push(gi < groupKeys.length - 1 ? '  },' : '  }');
+        });
+        lines.push('}');
+        return lines.join('\n');
+    }
+
+    function collectDescriptors(container) {
+        const descriptors = [];
+        container.querySelectorAll('.typo-row-check input:checked').forEach(cb => {
+            const row = cb.closest('.typo-row');
+            if (!row) return;
+            descriptors.push({
+                tag: row.dataset.tag,
+                font: decodeURIComponent(row.dataset.font),
+                size: row.dataset.size,
+                weight: row.dataset.weight,
+                lineHeight: row.dataset.lineHeight,
+                textTransform: row.dataset.textTransform,
+                letterSpacing: row.dataset.letterSpacing
+            });
+        });
+        return descriptors;
+    }
+
+    function exitAllCopyMode() {
+        fontList.classList.remove('copy-mode-all');
+        delete fontList.dataset.copyFormat;
+        fontList.querySelectorAll('.typo-all-copy-pill.active').forEach(p => p.classList.remove('active'));
+        fontList.querySelectorAll('.typo-group').forEach(g => {
+            g.classList.remove('copy-mode');
+            delete g.dataset.copyFormat;
+        });
+        fontList.querySelectorAll('.typo-row-check input').forEach(cb => { cb.checked = true; });
+        const copyBtn = fontList.querySelector('.typo-all-copy-btn');
+        if (copyBtn) copyBtn.remove();
+    }
+
     function displayTypography(typoGroups) {
         if (!typoGroups || typoGroups.length === 0) {
             fontList.innerHTML = '<div class="no-fonts">No typography detected on this page</div>';
@@ -107,6 +199,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="typo-toggle">
                         <button class="typo-toggle-btn ${lineHeightMode === 'ratio' ? 'active' : ''}" data-group="lh" data-mode="ratio">Ratio</button>
                         <button class="typo-toggle-btn ${lineHeightMode === 'original' ? 'active' : ''}" data-group="lh" data-mode="original">px</button>
+                    </div>
+                </div>
+                <div class="typo-options">
+                    <span class="typo-options-label">Copy all</span>
+                    <div class="typo-classifier-actions">
+                        <button class="typo-all-copy-pill" data-format="css">CSS</button>
+                        <button class="typo-all-copy-pill" data-format="tokens">Tokens</button>
                     </div>
                 </div>
             </div>
@@ -178,6 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pill = e.target.closest('.typo-group-copy-pill');
             if (!pill) return;
             e.stopPropagation();
+            if (fontList.classList.contains('copy-mode-all')) return;
 
             const group = pill.closest('.typo-group');
             const wasActive = pill.classList.contains('active');
@@ -207,20 +307,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const count = group.querySelectorAll('.typo-row-check input:checked').length;
                 const btn = document.createElement('button');
                 btn.className = 'typo-group-copy-btn';
-                btn.textContent = `Copy ${count} style${count === 1 ? '' : 's'}`;
+                btn.textContent = `COPY (${count})`;
                 group.appendChild(btn);
             }
         });
 
-        // Checkbox change handler — update copy button count
+        // Checkbox change handler — update copy button count (group or all)
         fontList.addEventListener('change', (e) => {
             if (!e.target.closest('.typo-row-check')) return;
+
+            // All-groups mode
+            if (fontList.classList.contains('copy-mode-all')) {
+                const count = fontList.querySelectorAll('.typo-row-check input:checked').length;
+                const btn = fontList.querySelector('.typo-all-copy-btn');
+                if (btn) {
+                    btn.textContent = `COPY (${count})`;
+                    btn.disabled = count === 0;
+                }
+                return;
+            }
+
+            // Per-group mode
             const group = e.target.closest('.typo-group');
             if (!group || !group.classList.contains('copy-mode')) return;
             const count = group.querySelectorAll('.typo-row-check input:checked').length;
             const btn = group.querySelector('.typo-group-copy-btn');
             if (btn) {
-                btn.textContent = `Copy ${count} style${count === 1 ? '' : 's'}`;
+                btn.textContent = `COPY (${count})`;
                 btn.disabled = count === 0;
             }
         });
@@ -232,26 +345,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.stopPropagation();
 
             const group = btn.closest('.typo-group');
-            const checkedRows = group.querySelectorAll('.typo-row-check input:checked');
             const activePill = group.querySelector('.typo-group-copy-pill.active');
             const format = activePill ? activePill.dataset.format : 'css';
-
-            // Collect style descriptors from checked rows
-            const descriptors = [];
-            checkedRows.forEach(cb => {
-                const row = cb.closest('.typo-row');
-                if (!row) return;
-                descriptors.push({
-                    tag: row.dataset.tag,
-                    font: decodeURIComponent(row.dataset.font),
-                    size: row.dataset.size,
-                    weight: row.dataset.weight,
-                    lineHeight: row.dataset.lineHeight,
-                    textTransform: row.dataset.textTransform,
-                    letterSpacing: row.dataset.letterSpacing
-                });
-            });
-
+            const descriptors = collectDescriptors(group);
             if (descriptors.length === 0) return;
 
             try {
@@ -260,73 +356,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     function: getGroupStyles,
                     args: [descriptors]
                 });
-                const allStyles = results[0].result || [];
-
-                let text;
-                if (format === 'css') {
-                    text = allStyles.map(s => {
-                        const lines = [`/* ${s.tag} */`];
-                        lines.push(`font-family: ${s.fontFamily};`);
-                        if (s.fontStyle !== 'normal') lines.push(`font-style: ${s.fontStyle};`);
-                        lines.push(`font-weight: ${s.fontWeight};`);
-                        lines.push(`font-size: ${s.fontSize};`);
-                        lines.push(`line-height: ${s.lineHeight};`);
-                        lines.push(`letter-spacing: ${s.letterSpacing};`);
-                        lines.push(`text-transform: ${s.textTransform};`);
-                        lines.push(`color: ${s.color};`);
-                        return lines.join('\n');
-                    }).join('\n\n');
-                } else {
-                    const camelCase = (s) => s.trim().split(/\s+/).map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
-                    const numKey = (v) => { const n = parseFloat(v); return isNaN(n) ? v : String(n % 1 === 0 ? Math.round(n) : +n.toFixed(2)); };
-                    const letterSpacingNames = {
-                        '0px': '0', 'normal': '0',
-                        '0.5px': 'half', '-0.5px': 'minus-half',
-                        '1px': '1', '-1px': 'minus-1',
-                        '1.5px': '1-half', '-1.5px': 'minus-1-half',
-                        '2px': '2', '-2px': 'minus-2'
-                    };
-
-                    // Merge all styles into deduplicated property groups
-                    const groups = {
-                        'font-family': {},
-                        'font-weight': {},
-                        'font-size': {},
-                        'line-height': {},
-                        'letter-spacing': {},
-                        'text-transform': {}
-                    };
-                    allStyles.forEach(s => {
-                        const cleanFont = s.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
-                        const lsKey = letterSpacingNames[s.letterSpacing] || numKey(s.letterSpacing);
-
-                        groups['font-family'][camelCase(cleanFont)] = { type: 'string', value: cleanFont };
-                        groups['font-weight'][String(s.fontWeight)] = { type: 'dimension', value: s.fontWeight };
-                        groups['font-size'][numKey(s.fontSize)] = { type: 'dimension', value: s.fontSize };
-                        groups['line-height'][numKey(s.lineHeight)] = { type: 'dimension', value: s.lineHeight };
-                        groups['letter-spacing'][lsKey] = { type: 'dimension', value: s.letterSpacing };
-                        groups['text-transform'][s.textTransform] = { type: 'string', value: s.textTransform };
-                    });
-
-                    const j = (v) => JSON.stringify(v);
-                    const lines = ['{'];
-                    const groupKeys = Object.keys(groups);
-                    groupKeys.forEach((gk, gi) => {
-                        lines.push(`  ${j(gk)}: {`);
-                        const entries = Object.entries(groups[gk]);
-                        entries.forEach(([k, v], i) => {
-                            const comma = i < entries.length - 1 ? ',' : '';
-                            lines.push(`    ${j(k)}: { "type": ${j(v.type)}, "value": ${j(v.value)} }${comma}`);
-                        });
-                        lines.push(gi < groupKeys.length - 1 ? '  },' : '  }');
-                    });
-                    lines.push('}');
-                    text = lines.join('\n');
-                }
-
+                const text = formatStyles(results[0].result || [], format);
                 await navigator.clipboard.writeText(text);
 
-                // Ghost animation on the button
                 const ghost = document.createElement('span');
                 ghost.className = 'typo-copy-ghost';
                 ghost.textContent = 'Copied!';
@@ -342,6 +374,84 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btn.remove();
             } catch (error) {
                 console.error('Error copying group styles:', error);
+            }
+        });
+
+        // All-groups copy pill click handler
+        fontList.addEventListener('click', (e) => {
+            const pill = e.target.closest('.typo-all-copy-pill');
+            if (!pill) return;
+            e.stopPropagation();
+
+            const wasActive = pill.classList.contains('active');
+
+            // Switch format if different pill active
+            const activePill = fontList.querySelector('.typo-all-copy-pill.active');
+            if (activePill && activePill !== pill) {
+                activePill.classList.remove('active');
+                pill.classList.add('active');
+                fontList.dataset.copyFormat = pill.dataset.format;
+                fontList.querySelectorAll('.typo-group').forEach(g => { g.dataset.copyFormat = pill.dataset.format; });
+                return;
+            }
+
+            if (wasActive) {
+                exitAllCopyMode();
+            } else {
+                // Exit any per-group copy mode first
+                fontList.querySelectorAll('.typo-group.copy-mode').forEach(g => {
+                    g.classList.remove('copy-mode');
+                    delete g.dataset.copyFormat;
+                    g.querySelectorAll('.typo-group-copy-pill.active').forEach(p => p.classList.remove('active'));
+                    g.querySelectorAll('.typo-row-check input').forEach(cb => { cb.checked = true; });
+                    const b = g.querySelector('.typo-group-copy-btn');
+                    if (b) b.remove();
+                });
+
+                fontList.classList.add('copy-mode-all');
+                fontList.dataset.copyFormat = pill.dataset.format;
+                pill.classList.add('active');
+                fontList.querySelectorAll('.typo-group').forEach(g => {
+                    g.classList.add('copy-mode');
+                    g.dataset.copyFormat = pill.dataset.format;
+                });
+                const count = fontList.querySelectorAll('.typo-row-check input:checked').length;
+                const btn = document.createElement('button');
+                btn.className = 'typo-all-copy-btn';
+                btn.textContent = `COPY (${count})`;
+                fontList.appendChild(btn);
+            }
+        });
+
+        // All-groups copy button click handler
+        fontList.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.typo-all-copy-btn');
+            if (!btn) return;
+            e.stopPropagation();
+
+            const format = fontList.dataset.copyFormat || 'css';
+            const descriptors = collectDescriptors(fontList);
+            if (descriptors.length === 0) return;
+
+            try {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: currentTab.id },
+                    function: getGroupStyles,
+                    args: [descriptors]
+                });
+                const text = formatStyles(results[0].result || [], format);
+                await navigator.clipboard.writeText(text);
+
+                const ghost = document.createElement('span');
+                ghost.className = 'typo-copy-ghost';
+                ghost.textContent = 'Copied!';
+                btn.style.position = 'relative';
+                btn.appendChild(ghost);
+                ghost.addEventListener('animationend', () => ghost.remove());
+
+                exitAllCopyMode();
+            } catch (error) {
+                console.error('Error copying all styles:', error);
             }
         });
 
