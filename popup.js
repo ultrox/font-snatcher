@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${fmtLineHeight(style.lineHeight, style.size)} / ${style.displayName}</span>
                         <span class="typo-count">&times;${style.count}</span>
                     </div>
-                    <div class="typo-preview" style="font-family: ${previewFont}; font-size: ${previewSize}px; font-weight: ${style.weight}; line-height: ${style.lineHeight}">${escapedSample}</div>`;
+                    <div class="typo-preview" style="font-family: ${previewFont}; font-size: ${previewSize}px; font-weight: ${style.weight}; line-height: ${style.lineHeight}; font-style: ${style.fontStyle}; text-transform: ${style.textTransform}; letter-spacing: ${style.letterSpacing}">${escapedSample}</div>`;
                 }).join('')}
             </div>
         `).join('');
@@ -792,6 +792,9 @@ function detectTypography() {
         const size = targetStyle.fontSize;
         const weight = targetStyle.fontWeight;
         const lineHeight = targetStyle.lineHeight;
+        const fontStyle = targetStyle.fontStyle;
+        const textTransform = targetStyle.textTransform;
+        const letterSpacing = targetStyle.letterSpacing;
         const displayName = fontFamily.split(',')[0].replace(/['"]/g, '').trim();
 
         const key = `${tag}|${fontFamily}|${size}|${weight}|${lineHeight}`;
@@ -806,7 +809,7 @@ function detectTypography() {
             });
             const firstText = tw.nextNode();
             const sample = firstText ? firstText.textContent.trim().slice(0, 60) : '';
-            styleMap.set(key, { tag, font: fontFamily, displayName, size, weight, lineHeight, count: 0, sample });
+            styleMap.set(key, { tag, font: fontFamily, displayName, size, weight, lineHeight, fontStyle, textTransform, letterSpacing, count: 0, sample });
         }
         styleMap.get(key).count++;
     }
@@ -831,9 +834,22 @@ function extractFontFaces() {
     const rules = [];
     for (const sheet of document.styleSheets) {
         try {
+            const baseURL = sheet.href || document.baseURI;
             for (const rule of sheet.cssRules) {
                 if (rule instanceof CSSFontFaceRule) {
-                    rules.push(rule.cssText);
+                    let cssText = rule.cssText;
+                    // Resolve relative font URLs to absolute so they work in the popup context
+                    cssText = cssText.replace(/url\(["']?([^"')]+)["']?\)/g, (match, url) => {
+                        if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+                            return match;
+                        }
+                        try {
+                            return `url("${new URL(url, baseURL).href}")`;
+                        } catch (e) {
+                            return match;
+                        }
+                    });
+                    rules.push(cssText);
                 }
             }
         } catch (e) { /* cross-origin stylesheet, skip */ }
