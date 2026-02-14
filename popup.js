@@ -162,11 +162,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             return ratio % 1 === 0 ? `${ratio}` : `${+ratio.toFixed(2)}`;
         };
 
+        const TAG_ORDER = { 'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6, 'p': 7, 'li': 8, 'td': 9, 'th': 10, 'button': 11, 'a': 12, 'label': 13, 'div': 14 };
         const sorted = typoGroups.map(group => ({
             ...group,
-            styles: [...group.styles].sort((a, b) =>
-                typoSortMode === 'size' ? parseFloat(b.size) - parseFloat(a.size) : b.count - a.count
-            )
+            styles: [...group.styles].sort((a, b) => {
+                const tagDiff = (TAG_ORDER[a.tag] || 999) - (TAG_ORDER[b.tag] || 999);
+                if (tagDiff !== 0) return tagDiff;
+                return typoSortMode === 'size' ? parseFloat(b.size) - parseFloat(a.size) : b.count - a.count;
+            })
         }));
 
         fontList.innerHTML = `
