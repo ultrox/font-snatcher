@@ -78,49 +78,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const wasActive = chip.classList.contains('active');
                 document.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('active'));
-                document.querySelectorAll('.copy-bar').forEach(el => el.remove());
 
                 if (!wasActive) {
                     chip.classList.add('active');
                     await highlightAndScrollTo(font, [tag]);
-
-                    const styles = await fetchElementStyles(font, tag);
-                    if (styles) {
-                        const cssText = formatCssText(styles);
-                        const fontGroup = chip.closest('.font-group');
-                        const copyBar = document.createElement('div');
-                        copyBar.className = 'copy-bar';
-                        const letterSpacingMetric = styles.letterSpacing !== 'normal'
-                            ? `<div class="metric"><span class="metric-label">Spacing</span><span class="metric-value">${styles.letterSpacing}</span></div>` : '';
-
-                        copyBar.innerHTML = `
-                            <div class="style-metrics">
-                                <div class="metric"><span class="metric-label">Size</span><span class="metric-value">${styles.fontSize}</span></div>
-                                <div class="metric"><span class="metric-label">Weight</span><span class="metric-value">${styles.fontWeight}</span></div>
-                                <div class="metric"><span class="metric-label">Line Height</span><span class="metric-value">${styles.lineHeight}</span></div>
-                                <div class="metric"><span class="metric-label">Color</span><span class="metric-value"><span class="color-swatch" style="background:${styles.color}"></span>${styles.color}</span></div>
-                                ${styles.fontStyle !== 'normal' ? `<div class="metric"><span class="metric-label">Style</span><span class="metric-value">${styles.fontStyle}</span></div>` : ''}
-                                ${letterSpacingMetric}
-                            </div>
-                            <button class="copy-css-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                Copy CSS
-                            </button>
-                        `;
-                        fontGroup.appendChild(copyBar);
-
-                        copyBar.querySelector('.copy-css-btn').addEventListener('click', async (ce) => {
-                            ce.stopPropagation();
-                            await navigator.clipboard.writeText(cssText);
-                            const btn = copyBar.querySelector('.copy-css-btn');
-                            btn.classList.add('copied');
-                            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
-                            setTimeout(() => {
-                                btn.classList.remove('copied');
-                                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy CSS';
-                            }, 1500);
-                        });
-                    }
                 } else {
                     highlightElements(font, [tag], false);
                 }
@@ -148,36 +109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 highlightElements(font, tags, false);
             });
         });
-    }
-
-    async function fetchElementStyles(fontFamily, tag) {
-        try {
-            if (!currentTab) return null;
-            const results = await chrome.scripting.executeScript({
-                target: { tabId: currentTab.id },
-                function: getComputedFontStyles,
-                args: [fontFamily, tag]
-            });
-            return results[0].result;
-        } catch (error) {
-            console.error('Error fetching styles:', error);
-            return null;
-        }
-    }
-
-    function formatCssText(styles) {
-        const lines = [
-            `font-family: ${styles.fontFamily};`,
-            `font-size: ${styles.fontSize};`,
-            `font-weight: ${styles.fontWeight};`,
-            `font-style: ${styles.fontStyle};`,
-            `line-height: ${styles.lineHeight};`,
-            `color: ${styles.color};`
-        ];
-        if (styles.letterSpacing !== 'normal') {
-            lines.push(`letter-spacing: ${styles.letterSpacing};`);
-        }
-        return lines.join('\n');
     }
 
     async function highlightElements(fontFamily, tags, highlight) {
@@ -255,23 +186,29 @@ function detectFontsByElement() {
             node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
         );
 
-        if (hasDirectText && computedStyle.fontFamily) {
-            const fontFamily = computedStyle.fontFamily;
-            const tagName = element.tagName.toLowerCase();
+        if (!hasDirectText || !computedStyle.fontFamily) return;
 
-            if (!fontMap.has(fontFamily)) {
-                fontMap.set(fontFamily, {
-                    font: fontFamily,
-                    displayName: fontFamily.split(',')[0].replace(/['"]/g, '').trim(),
-                    tagCounts: new Map(),
-                    totalCount: 0
-                });
-            }
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        if (computedStyle.display === 'none') return;
+        if (computedStyle.visibility === 'hidden') return;
+        if (computedStyle.opacity === '0') return;
 
-            const entry = fontMap.get(fontFamily);
-            entry.tagCounts.set(tagName, (entry.tagCounts.get(tagName) || 0) + 1);
-            entry.totalCount++;
+        const fontFamily = computedStyle.fontFamily;
+        const tagName = element.tagName.toLowerCase();
+
+        if (!fontMap.has(fontFamily)) {
+            fontMap.set(fontFamily, {
+                font: fontFamily,
+                displayName: fontFamily.split(',')[0].replace(/['"]/g, '').trim(),
+                tagCounts: new Map(),
+                totalCount: 0
+            });
         }
+
+        const entry = fontMap.get(fontFamily);
+        entry.tagCounts.set(tagName, (entry.tagCounts.get(tagName) || 0) + 1);
+        entry.totalCount++;
     });
 
     // Convert to array and format
@@ -304,29 +241,6 @@ function detectFontsByElement() {
     });
 
     return groups;
-}
-
-// Content script function: Get computed font styles for first matching element
-function getComputedFontStyles(fontFamily, tag) {
-    const elements = document.querySelectorAll(tag);
-    for (const element of elements) {
-        const computedStyle = window.getComputedStyle(element);
-        if (computedStyle.fontFamily !== fontFamily) continue;
-        const hasDirectText = Array.from(element.childNodes).some(
-            node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
-        );
-        if (!hasDirectText) continue;
-        return {
-            fontFamily: computedStyle.fontFamily,
-            fontSize: computedStyle.fontSize,
-            fontWeight: computedStyle.fontWeight,
-            fontStyle: computedStyle.fontStyle,
-            lineHeight: computedStyle.lineHeight,
-            letterSpacing: computedStyle.letterSpacing,
-            color: computedStyle.color
-        };
-    }
-    return null;
 }
 
 // Content script function: Toggle element highlighting
