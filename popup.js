@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let activeTab = 'fonts';
     let cachedFontGroups = null;
     let cachedTypographyGroups = null;
+    let lineHeightMode = 'ratio';
 
     // Background detects popup close via port disconnect and runs cleanup
     chrome.runtime.connect({ name: 'popup' });
@@ -151,7 +152,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const n = parseFloat(v);
             return isNaN(n) ? v : n % 1 === 0 ? `${n}px` : `${+n.toFixed(2)}px`;
         };
-        const lineHeightRatio = (lh, size) => {
+        const fmtLineHeight = (lh, size) => {
+            if (lineHeightMode === 'original') return roundPx(lh);
             const lhN = parseFloat(lh);
             const sizeN = parseFloat(size);
             if (isNaN(lhN) || isNaN(sizeN) || sizeN === 0) return lh;
@@ -159,18 +161,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             return ratio % 1 === 0 ? `${ratio}` : `${+ratio.toFixed(2)}`;
         };
 
-        fontList.innerHTML = typoGroups.map(group => `
+        fontList.innerHTML = `
+            <div class="typo-options">
+                <label class="typo-checkbox">
+                    <input type="checkbox" ${lineHeightMode === 'ratio' ? 'checked' : ''}>
+                    <span>Line height as ratio</span>
+                </label>
+            </div>
+        ` + typoGroups.map(group => `
             <div class="typo-group">
                 <div class="typo-classifier">${group.classifier}</div>
                 ${group.styles.map(style => `
                     <div class="typo-row" data-tag="${style.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">
                         <span class="typo-row-tag">${style.tag}</span>
-                        <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${lineHeightRatio(style.lineHeight, style.size)} / ${style.displayName}</span>
+                        <span class="typo-metrics">${roundPx(style.size)} / ${style.weight} / ${fmtLineHeight(style.lineHeight, style.size)} / ${style.displayName}</span>
                         <span class="typo-count">&times;${style.count}</span>
                     </div>
                 `).join('')}
             </div>
         `).join('');
+
+        // Line height mode toggle
+        fontList.querySelector('.typo-checkbox input').addEventListener('change', (e) => {
+            lineHeightMode = e.target.checked ? 'ratio' : 'original';
+            displayTypography(typoGroups);
+        });
 
         // Click to highlight matching elements
         document.querySelectorAll('.typo-row').forEach(row => {

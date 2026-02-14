@@ -201,6 +201,25 @@ body {
     text-align: center;
 }
 
+.typo-options {
+    margin-bottom: 10px;
+}
+
+.typo-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #888;
+    cursor: pointer;
+    user-select: none;
+}
+
+.typo-checkbox input {
+    accent-color: #007acc;
+    margin: 0;
+}
+
 /* Typography view styles */
 .typo-group {
     padding: 14px 16px;
