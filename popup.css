@@ -278,6 +278,56 @@ body {
     display: block;
 }
 
+.typo-group.show-preview .typo-preview.typo-preview-row {
+    display: flex;
+}
+
+.typo-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.typo-jump-btn {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 4px;
+    background: #eee;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.12s ease;
+}
+
+.typo-jump-btn:hover {
+    background: #dbeeff;
+    color: #007acc;
+}
+
+.typo-preview-active {
+    background: rgba(255, 149, 0, 0.08);
+    border-radius: 6px;
+}
+
+.typo-preview-active .typo-jump-btn {
+    background: rgba(255, 149, 0, 0.2);
+    color: #e08600;
+}
+
+.typo-preview-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: text;
+}
+
 .loading {
     text-align: center;
     padding: 40px 20px;

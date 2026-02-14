@@ -157,6 +157,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!group.classList.contains('show-preview')) {
                     group.querySelectorAll('.typo-preview-instance').forEach(el => el.remove());
                     group.querySelectorAll('.typo-count.expanded').forEach(b => b.classList.remove('expanded'));
+                    group.querySelectorAll('.typo-preview-active').forEach(el => el.classList.remove('typo-preview-active'));
+                    group.querySelectorAll('.typo-preview-row').forEach(p => {
+                        const textSpan = p.querySelector('.typo-preview-text');
+                        const text = textSpan ? textSpan.textContent : p.textContent;
+                        p.classList.remove('typo-preview-row');
+                        p.innerHTML = '';
+                        p.textContent = text;
+                    });
                 }
             });
         });
@@ -198,6 +206,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Collapse any previously expanded in this group
                 group.querySelectorAll('.typo-preview-instance').forEach(el => el.remove());
                 group.querySelectorAll('.typo-count.expanded').forEach(b => b.classList.remove('expanded'));
+                group.querySelectorAll('.typo-preview-active').forEach(el => el.classList.remove('typo-preview-active'));
+                group.querySelectorAll('.typo-preview-row').forEach(p => {
+                    const textSpan = p.querySelector('.typo-preview-text');
+                    const text = textSpan ? textSpan.textContent : p.textContent;
+                    p.classList.remove('typo-preview-row');
+                    p.innerHTML = '';
+                    p.textContent = text;
+                });
 
                 if (!wasExpanded) {
                     btn.classList.add('expanded');
@@ -214,19 +230,101 @@ document.addEventListener('DOMContentLoaded', async () => {
                             args: [tag, font, size, weight, lineHeight]
                         });
                         const samples = results[0].result || [];
+
+                        // Add jump button to base preview
+                        const baseText = preview.textContent;
+                        preview.innerHTML = '';
+                        preview.classList.add('typo-preview-row');
+                        const baseJumpBtn = document.createElement('button');
+                        baseJumpBtn.className = 'typo-jump-btn';
+                        baseJumpBtn.dataset.tag = tag;
+                        baseJumpBtn.dataset.font = btn.dataset.font;
+                        baseJumpBtn.dataset.size = size;
+                        baseJumpBtn.dataset.weight = weight;
+                        baseJumpBtn.dataset.lineHeight = lineHeight;
+                        baseJumpBtn.dataset.elementIndex = samples.length > 0 ? samples[0].index : 0;
+                        baseJumpBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>';
+                        const baseSpan = document.createElement('span');
+                        baseSpan.className = 'typo-preview-text';
+                        baseSpan.textContent = baseText;
+                        preview.appendChild(baseJumpBtn);
+                        preview.appendChild(baseSpan);
+
                         let insertAfter = preview;
-                        samples.slice(1).forEach(text => {
+                        samples.slice(1).forEach(sample => {
                             const el = document.createElement('div');
-                            el.className = 'typo-preview typo-preview-instance';
+                            el.className = 'typo-preview typo-preview-instance typo-preview-row';
                             el.style.cssText = preview.style.cssText;
-                            el.style.display = 'block';
-                            el.textContent = text;
+                            el.style.display = 'flex';
+                            const jumpBtn = document.createElement('button');
+                            jumpBtn.className = 'typo-jump-btn';
+                            jumpBtn.dataset.tag = tag;
+                            jumpBtn.dataset.font = btn.dataset.font;
+                            jumpBtn.dataset.size = size;
+                            jumpBtn.dataset.weight = weight;
+                            jumpBtn.dataset.lineHeight = lineHeight;
+                            jumpBtn.dataset.elementIndex = sample.index;
+                            jumpBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>';
+                            const span = document.createElement('span');
+                            span.className = 'typo-preview-text';
+                            span.textContent = sample.text;
+                            el.appendChild(jumpBtn);
+                            el.appendChild(span);
                             insertAfter.after(el);
                             insertAfter = el;
                         });
                     }
+                } else {
+                    // Restore base preview to plain text
+                    const preview = row.nextElementSibling;
+                    if (preview && preview.classList.contains('typo-preview')) {
+                        const textSpan = preview.querySelector('.typo-preview-text');
+                        const text = textSpan ? textSpan.textContent : preview.textContent;
+                        preview.classList.remove('typo-preview-row');
+                        preview.innerHTML = '';
+                        preview.textContent = text;
+                    }
                 }
             });
+        });
+
+        // Jump button click handler (event delegation)
+        fontList.addEventListener('click', async (e) => {
+            const jumpBtn = e.target.closest('.typo-jump-btn');
+            if (!jumpBtn) return;
+            e.stopPropagation();
+
+            const previewLine = jumpBtn.closest('.typo-preview');
+            const wasActive = previewLine && previewLine.classList.contains('typo-preview-active');
+
+            // Deselect any previously active preview line
+            fontList.querySelectorAll('.typo-preview-active').forEach(el => el.classList.remove('typo-preview-active'));
+
+            if (wasActive) {
+                // Deselect: just clear the focused highlight on the page
+                await clearFocusHighlight();
+                return;
+            }
+
+            // Select this preview line
+            if (previewLine) previewLine.classList.add('typo-preview-active');
+
+            const tag = jumpBtn.dataset.tag;
+            const font = decodeURIComponent(jumpBtn.dataset.font);
+            const size = jumpBtn.dataset.size;
+            const weight = jumpBtn.dataset.weight;
+            const lineHeight = jumpBtn.dataset.lineHeight;
+            const elementIndex = parseInt(jumpBtn.dataset.elementIndex, 10);
+
+            // Ensure group highlights are shown first
+            const row = previewLine && previewLine.closest('.typo-group').querySelector(`.typo-row[data-tag="${tag}"][data-size="${size}"][data-weight="${weight}"]`);
+            if (row && !row.classList.contains('active')) {
+                document.querySelectorAll('.typo-row').forEach(r => r.classList.remove('active'));
+                row.classList.add('active');
+                await highlightTypographyElements(tag, font, size, weight, lineHeight);
+            }
+
+            await scrollToElement(tag, font, size, weight, lineHeight, elementIndex);
         });
     }
 
@@ -249,15 +347,40 @@ document.addEventListener('DOMContentLoaded', async () => {
             await chrome.scripting.executeScript({
                 target: { tabId: currentTab.id },
                 function: () => {
-                    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
+                    document.querySelectorAll('.wff-highlight, .wff-highlight-focus').forEach(el => el.remove());
                     document.querySelectorAll('.wff-anchored').forEach(el => {
                         el.style.anchorName = '';
-                        el.classList.remove('wff-anchored');
+                        el.classList.remove('wff-anchored', 'wff-focused');
                     });
                 }
             });
         } catch (error) {
             console.error('Error clearing highlights:', error);
+        }
+    }
+
+    async function scrollToElement(tag, fontFamily, size, weight, lineHeight, elementIndex) {
+        try {
+            if (!currentTab) return;
+            await chrome.scripting.executeScript({
+                target: { tabId: currentTab.id },
+                function: scrollToTypographyElement,
+                args: [tag, fontFamily, size, weight, lineHeight, elementIndex]
+            });
+        } catch (error) {
+            console.error('Error scrolling to element:', error);
+        }
+    }
+
+    async function clearFocusHighlight() {
+        try {
+            if (!currentTab) return;
+            await chrome.scripting.executeScript({
+                target: { tabId: currentTab.id },
+                function: clearFocusedHighlight
+            });
+        } catch (error) {
+            console.error('Error clearing focus highlight:', error);
         }
     }
 
@@ -574,6 +697,7 @@ function detectTypography() {
 function getTypographySamples(tag, fontFamily, size, weight, lineHeight) {
     const elements = document.querySelectorAll(tag);
     const samples = [];
+    let index = 0;
     elements.forEach(element => {
         const cs = window.getComputedStyle(element);
         if (cs.fontFamily !== fontFamily) return;
@@ -588,8 +712,9 @@ function getTypographySamples(tag, fontFamily, size, weight, lineHeight) {
         });
         const firstText = tw.nextNode();
         if (firstText) {
-            samples.push(firstText.textContent.trim().slice(0, 60));
+            samples.push({ text: firstText.textContent.trim().slice(0, 60), index });
         }
+        index++;
     });
     return samples;
 }
@@ -624,10 +749,10 @@ function extractFontFaces() {
 
 // Content script function: Highlight elements matching a specific typography combination
 function highlightTypographyMatches(tag, fontFamily, size, weight, lineHeight) {
-    document.querySelectorAll('.wff-highlight').forEach(el => el.remove());
+    document.querySelectorAll('.wff-highlight, .wff-highlight-focus').forEach(el => el.remove());
     document.querySelectorAll('.wff-anchored').forEach(el => {
         el.style.anchorName = '';
-        el.classList.remove('wff-anchored');
+        el.classList.remove('wff-anchored', 'wff-focused');
     });
 
     const elements = document.querySelectorAll(tag);
@@ -673,4 +798,66 @@ function highlightTypographyMatches(tag, fontFamily, size, weight, lineHeight) {
     if (firstElement) {
         firstElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+}
+
+// Content script function: Scroll to and highlight a specific element with a distinct focus style
+function scrollToTypographyElement(tag, fontFamily, size, weight, lineHeight, elementIndex) {
+    // Remove only the focused highlight, keep all group highlights
+    document.querySelectorAll('.wff-highlight-focus').forEach(el => el.remove());
+    document.querySelectorAll('.wff-focused').forEach(el => el.classList.remove('wff-focused'));
+
+    const elements = document.querySelectorAll(tag);
+    let i = 0;
+    let target = null;
+
+    elements.forEach(element => {
+        const cs = window.getComputedStyle(element);
+        if (cs.fontFamily !== fontFamily) return;
+        if (cs.fontSize !== size) return;
+        if (cs.fontWeight !== weight) return;
+        if (cs.lineHeight !== lineHeight) return;
+        if (!element.textContent.trim()) return;
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        if (i === elementIndex) target = element;
+        i++;
+    });
+
+    if (!target) return;
+
+    // Ensure group highlights exist (in case row wasn't clicked first)
+    if (!target.classList.contains('wff-anchored')) {
+        const anchor = `--wff-a-focus`;
+        target.style.anchorName = anchor;
+        target.classList.add('wff-anchored');
+    }
+
+    target.classList.add('wff-focused');
+    const anchor = target.style.anchorName;
+
+    const focusEl = document.createElement('div');
+    focusEl.className = 'wff-highlight-focus';
+    focusEl.style.cssText = `
+        position: absolute;
+        position-anchor: ${anchor};
+        top: anchor(top);
+        left: anchor(left);
+        width: anchor-size(width);
+        height: anchor-size(height);
+        background-color: rgba(255, 149, 0, 0.12);
+        border: 2px solid rgba(255, 149, 0, 0.9);
+        pointer-events: none;
+        z-index: 1000000;
+        border-radius: 6px;
+        box-sizing: border-box;
+    `;
+    document.body.appendChild(focusEl);
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Content script function: Remove only the focused highlight
+function clearFocusedHighlight() {
+    document.querySelectorAll('.wff-highlight-focus').forEach(el => el.remove());
+    document.querySelectorAll('.wff-focused').forEach(el => el.classList.remove('wff-focused'));
 }
