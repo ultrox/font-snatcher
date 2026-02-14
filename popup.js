@@ -144,13 +144,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        fontCountText.textContent = `${typoGroups.length} element type${typoGroups.length === 1 ? '' : 's'} found`;
+        const totalStyles = typoGroups.reduce((sum, g) => sum + g.styles.length, 0);
+        fontCountText.textContent = `${totalStyles} style${totalStyles === 1 ? '' : 's'} across ${typoGroups.length} group${typoGroups.length === 1 ? '' : 's'}`;
 
         fontList.innerHTML = typoGroups.map(group => `
             <div class="typo-group">
-                <div class="typo-tag">&lt;${group.tag}&gt;</div>
+                <div class="typo-classifier">${group.classifier}</div>
                 ${group.styles.map(style => `
-                    <div class="typo-row" data-tag="${group.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">
+                    <div class="typo-row" data-tag="${style.tag}" data-font="${encodeURIComponent(style.font)}" data-size="${style.size}" data-weight="${style.weight}" data-line-height="${style.lineHeight}">
+                        <span class="typo-row-tag">${style.tag}</span>
                         <span class="typo-metrics">${style.size} / ${style.weight} / ${style.lineHeight} / ${style.displayName}</span>
                         <span class="typo-count">&times;${style.count}</span>
                     </div>
@@ -642,13 +644,19 @@ function disableInspectorMode() {
     document.querySelectorAll('.wff-hover-highlight, .wff-hover-tooltip, .wff-copy-toast').forEach(el => el.remove());
 }
 
-// Content script function: Detect typography grouped by semantic tag with metric breakdowns
+// Content script function: Detect typography grouped by classifier with metric breakdowns
 function detectTypography() {
-    const TAG_ORDER = { 'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6, 'p': 7, 'li': 8, 'td': 9, 'th': 10, 'label': 11, 'button': 12, 'a': 13, 'span': 14, 'div': 15 };
-    const SEMANTIC = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'td', 'th', 'label', 'button']);
-    const RELEVANT = new Set([...SEMANTIC, 'span', 'div', 'a']);
+    const TAG_ORDER = { 'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6, 'p': 7, 'li': 8, 'td': 9, 'th': 10, 'label': 11, 'button': 12, 'a': 13, 'div': 14 };
+    const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+    const CONTENT = new Set(['p', 'li', 'td', 'th']);
+    const INTERACTIVE = new Set(['button', 'a', 'label']);
+    const CLASSIFY = tag => HEADINGS.has(tag) ? 'Headings' : CONTENT.has(tag) ? 'Content' : INTERACTIVE.has(tag) ? 'Interactive' : 'Other';
+    const CLASSIFIER_ORDER = { 'Headings': 1, 'Content': 2, 'Interactive': 3, 'Other': 4 };
+
+    const SEMANTIC = new Set([...HEADINGS, ...CONTENT, ...INTERACTIVE]);
+    const RELEVANT = new Set([...SEMANTIC, 'span', 'div']);
     const counted = new Set();
-    const typoMap = new Map(); // tag -> Map<key, {font, displayName, size, weight, lineHeight, count}>
+    const classifierMap = new Map(); // classifier -> Map<key, {tag, font, displayName, size, weight, lineHeight, count}>
 
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
         acceptNode: n => n.textContent.trim().length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
@@ -689,6 +697,10 @@ function detectTypography() {
         counted.add(target);
 
         const tag = target.tagName.toLowerCase();
+        // Skip spans — they're inline wrappers, not distinct typographic decisions
+        if (tag === 'span') continue;
+
+        const classifier = CLASSIFY(tag);
         const targetStyle = window.getComputedStyle(target);
         const size = targetStyle.fontSize;
         const weight = targetStyle.fontWeight;
@@ -697,25 +709,29 @@ function detectTypography() {
 
         const key = `${tag}|${fontFamily}|${size}|${weight}|${lineHeight}`;
 
-        if (!typoMap.has(tag)) {
-            typoMap.set(tag, new Map());
+        if (!classifierMap.has(classifier)) {
+            classifierMap.set(classifier, new Map());
         }
-        const tagMap = typoMap.get(tag);
-        if (!tagMap.has(key)) {
-            tagMap.set(key, { font: fontFamily, displayName, size, weight, lineHeight, count: 0 });
+        const styleMap = classifierMap.get(classifier);
+        if (!styleMap.has(key)) {
+            styleMap.set(key, { tag, font: fontFamily, displayName, size, weight, lineHeight, count: 0 });
         }
-        tagMap.get(key).count++;
+        styleMap.get(key).count++;
     }
 
-    // Convert to sorted array
-    const groups = Array.from(typoMap.entries()).map(([tag, styleMap]) => ({
-        tag,
-        styles: Array.from(styleMap.values()).sort((a, b) => b.count - a.count)
+    // Convert to sorted array of classifier groups
+    const groups = Array.from(classifierMap.entries()).map(([classifier, styleMap]) => ({
+        classifier,
+        styles: Array.from(styleMap.values()).sort((a, b) => {
+            const tagDiff = (TAG_ORDER[a.tag] || 999) - (TAG_ORDER[b.tag] || 999);
+            return tagDiff !== 0 ? tagDiff : b.count - a.count;
+        })
     }));
 
-    groups.sort((a, b) => (TAG_ORDER[a.tag] || 999) - (TAG_ORDER[b.tag] || 999));
+    groups.sort((a, b) => CLASSIFIER_ORDER[a.classifier] - CLASSIFIER_ORDER[b.classifier]);
 
-    return groups;
+    // Drop empty "Other" if semantic tags covered everything
+    return groups.filter(g => g.styles.length > 0);
 }
 
 // Content script function: Highlight elements matching a specific typography combination
