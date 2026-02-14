@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let currentTab = null;
     let isInspectorActive = false;
-    let activeTab = 'fonts';
+    let activeTab = 'typography';
     let cachedFontGroups = null;
     let cachedTypographyGroups = null;
     let lineHeightMode = 'ratio';
